@@ -42,7 +42,7 @@ Communication:
 ## Technology Stack
 
 - **Language:** Java 21
-- **Framework:** Spring Boot 3.5.x (Spring MVC)
+- **Framework:** Spring Boot 3.5.9 (Spring MVC)
 - **Persistence:** PostgreSQL, Flyway
 - **Messaging:** Kafka
 - **Security:** Spring Security (OAuth2 Resource Server, JWT)
