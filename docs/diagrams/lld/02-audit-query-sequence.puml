@@ -1,0 +1,116 @@
+@startuml
+title AccessGuard - Audit Query (LLD Sequence)
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #333333
+  LifeLineBorderColor #333333
+  ParticipantBorderColor #333333
+  ParticipantFontColor #111111
+  ActorBorderColor #333333
+  ActorFontColor #111111
+}
+skinparam note {
+  BorderColor #333333
+  FontColor #111111
+}
+
+legend top
+Key points:
+- SECURITY is read-only
+- tenantId is derived from JWT claim and applied to every query
+- filters are optional but validated (time range, decision, doorId, attemptId, passRef, zoneId)
+- pagination is mandatory (page/size/sort) with a stable default sort
+endlegend
+
+actor "Security Officer" as SO
+participant "accessguard-audit\nAuditQueryController" as QC
+participant "JwtTenantResolver" as JTR
+participant "AuditQueryService" as QS
+participant "AuditQueryValidator" as QV
+participant "ZoneResolver\n(optional)" as ZR
+database "audit-db" as AUDITDB
+participant "AuditRepository\n(read model)" as AR
+
+== Request ==
+
+SO -> QC : GET /api/v1/audit/access-attempts\nHeaders: Authorization: Bearer JWT\nQuery: from, to, decision, doorId, attemptId, passRef, zoneId, page, size, sort
+activate QC
+
+QC -> JTR : extract tenantId + roles from JWT
+activate JTR
+JTR --> QC : tenantId + roles=SECURITY
+deactivate JTR
+
+note right of QC
+Authorization:
+- require role SECURITY
+Tenant isolation:
+- tenantId is mandatory for all reads
+end note
+
+QC -> QV : validateFilters(from,to,decision,doorId,attemptId,passRef,zoneId,page,size,sort)
+activate QV
+
+alt Invalid filters
+  QV --> QC : validation error (400)
+  deactivate QV
+  QC --> SO : 400 Bad Request\nProblemDetails with errorCode + field violations
+  deactivate QC
+  return
+else Valid filters
+  QV --> QC : ok (normalized filters)
+  deactivate QV
+end
+
+== Optional: Zone filter handling ==
+
+alt zoneId filter present
+  QC -> ZR : resolveDoorIdsInZone(tenantId, zoneId)\noptional optimization
+  activate ZR
+  ZR --> QC : doorId set (could be empty)
+  deactivate ZR
+
+  note right of ZR
+Zone hierarchy is modeled in core, but audit may:
+- store zoneId/door-zone mapping as part of audit projection, OR
+- maintain its own zone reference snapshot for query-time filtering.
+
+Implementation choice:
+- Prefer audit projection includes doorId + zoneId for fast querying.
+  end note
+end
+
+== Query ==
+
+QC -> QS : searchAuditAttempts(tenantId, filters, pagination)
+activate QS
+
+QS -> AR : findAuditAttempts(tenantId, filters, pageRequest)
+activate AR
+
+AR -> AUDITDB : SELECT ... FROM audit_access_attempts\nWHERE tenant_id = :tenantId\nAND optional filters...\nORDER BY evaluatedAt desc, attemptId asc\nLIMIT/OFFSET
+AUDITDB --> AR : Page<AuditAccessAttemptRow>
+AR --> QS : page results
+deactivate AR
+
+QS --> QC : page results mapped to API DTO
+deactivate QS
+
+== Response ==
+
+QC --> SO : 200 OK\nPaginated list + page metadata
+deactivate QC
+
+note bottom
+Recommended defaults:
+- sort = evaluatedAt desc
+- page size capped (e.g., 100)
+- response includes totalElements and totalPages (Spring Page)
+Security posture:
+- audit is read-only
+- all results tenant-scoped; no cross-tenant leakage
+end note
+
+@enduml

@@ -1,0 +1,86 @@
+@startuml
+title AccessGuard - Pass Lifecycle (LLD State Machine)
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam state {
+  BorderColor #333333
+  FontColor #111111
+  ArrowColor #333333
+}
+skinparam note {
+  BorderColor #333333
+  FontColor #111111
+}
+
+legend top
+Definitions:
+- ACTIVE means pass is not revoked and the current time may or may not be inside the validity window
+- VALID_NOW is a derived runtime condition: now in [validFrom, validTo]
+- EXPIRED is derived: now > validTo
+- REVOKED is terminal and overrides time validity
+Notes:
+- We model REVOKED as a persisted status
+- EXPIRED is typically computed
+endlegend
+
+[*] --> DRAFT : Create pass\nstatus=DRAFT (optional)\nOR status=ACTIVE directly
+
+state DRAFT {
+  [*] --> Drafted
+  Drafted --> [*]
+}
+
+DRAFT --> ACTIVE : Activate pass\n(optional API)\nOR create as ACTIVE
+
+state ACTIVE {
+  [*] --> Active
+
+  note right of Active
+  Invariants:
+  - passCode is immutable once issued (recommended)
+  - tenantId is immutable
+  - validFrom < validTo
+  - scope is tenant-scoped (doorIds/zoneIds belong to tenant)
+  end note
+
+  Active --> Active : Update validity window\nPATCH /passes/{id}\nif not revoked
+  Active --> Active : Update scope\nPATCH /passes/{id}\nif not revoked
+
+  Active --> REVOKED : Revoke\nPOST /passes/{id}/revoke\nreason recorded
+}
+
+state REVOKED {
+  [*] --> Revoked
+  note right of Revoked
+  Terminal state:
+  - cannot be re-activated
+  - updates to validity/scope are rejected
+  - validation returns DENIED PASS_REVOKED
+  end note
+}
+
+' Derived state views (not persisted states)
+state "Derived Views\n(runtime evaluation)" as Derived {
+  state "VALID_NOW\nnow within window" as VALID_NOW
+  state "EXPIRED\nnow past validTo" as EXPIRED
+
+  VALID_NOW --> EXPIRED : time passes\n(now > validTo)
+}
+
+ACTIVE --> Derived : Evaluate at validation time\n(check window)
+
+note bottom
+Validation decision mapping (core):
+- if status=REVOKED -> DENIED PASS_REVOKED
+- else if pass not found -> DENIED PASS_NOT_FOUND
+- else if now < validFrom or now > validTo -> DENIED PASS_EXPIRED_OR_NOT_YET_VALID
+- else if out of scope -> DENIED OUT_OF_SCOPE
+- else -> GRANTED OK
+
+Business rule choice:
+- treat "EXPIRED" as derived (recommended) rather than persisted,
+  unless reporting/performance requires materialization.
+end note
+
+@enduml

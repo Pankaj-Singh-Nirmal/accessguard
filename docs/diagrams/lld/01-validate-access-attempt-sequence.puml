@@ -1,0 +1,231 @@
+@startuml
+title AccessGuard - Validate Access Attempt (LLD Sequence)
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #333333
+  LifeLineBorderColor #333333
+  ParticipantBorderColor #333333
+  ParticipantFontColor #111111
+  ActorBorderColor #333333
+  ActorFontColor #111111
+}
+skinparam note {
+  BorderColor #333333
+  FontColor #111111
+}
+
+legend top
+Key points:
+- tenantId is enforced on every lookup
+- correlationId is propagated across logs and event envelope
+- core idempotency key: tenantId + attemptId
+- audit consumer idempotency: eventId (primary) OR tenantId + attemptId (secondary)
+endlegend
+
+actor Device as D
+participant "accessguard-core\nAccessAttemptController" as C
+participant "TenantContextResolver" as TCR
+participant "AccessAttemptService" as S
+participant "IdempotencyStore\n(or AccessAttemptRepository)" as IDEMP
+database "core-db" as COREDB
+participant "PassRepository" as PR
+participant "DoorRepository" as DR
+participant "ZoneAuthService\n(zone hierarchy)" as ZA
+participant "KafkaProducer\nEventPublisher" as KP
+queue "Kafka topic\naccessguard.events" as KTOPIC
+participant "accessguard-audit\nKafkaConsumer" as AC
+participant "AuditIngestionService" as AIS
+database "audit-db" as AUDITDB
+participant "AuditRepository" as AR
+
+== Request ==
+
+D -> C : POST /api/v1/access-attempts\nHeaders: correlationId (optional)\nBody: attemptId, doorId, passCode, occurredAt
+activate C
+
+C -> TCR : deriveTenantContext(device identity)\nresolve tenantId
+activate TCR
+TCR --> C : tenantId + deviceId
+deactivate TCR
+
+note right of C
+Device identity establishes tenant context.
+All subsequent lookups MUST be constrained by tenantId.
+end note
+
+C -> S : validateAccessAttempt(tenantId, deviceId, attemptId, doorId, passCode, occurredAt, correlationId)
+activate S
+
+== Idempotency (core) ==
+
+S -> IDEMP : findByTenantAndAttemptId(tenantId, attemptId)
+activate IDEMP
+IDEMP --> S : existingAttempt? (decision + reasonCode + evaluatedAt) or empty
+deactivate IDEMP
+
+alt Duplicate attemptId for tenant
+  note right of S
+  Idempotency rule:
+  same tenantId+attemptId must return identical response body.
+  end note
+  S --> C : decision + reasonCode + evaluatedAt\n(from stored record)
+  deactivate S
+  C --> D : 200 OK\n{attemptId, decision, reasonCode, evaluatedAt, validUntil?}
+  deactivate C
+  return
+else New attempt
+end
+
+== Validation and decisioning ==
+
+S -> DR : findDoor(tenantId, doorId)
+activate DR
+DR --> S : door or null
+deactivate DR
+
+alt Door not found
+  S -> COREDB : insert access_attempts\n(tenantId, attemptId, doorId, passCodeRef, decision=DENIED, reason=DOOR_NOT_FOUND, occurredAt, correlationId)
+  note right of S
+  Device API semantics:
+  prefer 200 with decision to avoid leakage.
+  end note
+  S -> KP : publish access_attempt_recorded\nwith event envelope + payload
+  activate KP
+  KP -> KTOPIC : produce(event)
+  deactivate KP
+  S --> C : DENIED, reasonCode=DOOR_NOT_FOUND
+  deactivate S
+  C --> D : 200 OK\nDENIED + reasonCode
+  deactivate C
+  return
+end
+
+S -> PR : findPassByCode(tenantId, passCode)
+activate PR
+PR --> S : pass or null
+deactivate PR
+
+alt Pass not found
+  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=PASS_NOT_FOUND ...)
+  S -> KP : publish access_attempt_recorded
+  activate KP
+  KP -> KTOPIC : produce(event)
+  deactivate KP
+  S --> C : DENIED, reasonCode=PASS_NOT_FOUND
+  deactivate S
+  C --> D : 200 OK\nDENIED + reasonCode
+  deactivate C
+  return
+end
+
+S -> S : checkPassState(pass)
+alt Pass revoked
+  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=PASS_REVOKED ...)
+  S -> KP : publish access_attempt_recorded
+  activate KP
+  KP -> KTOPIC : produce(event)
+  deactivate KP
+  S --> C : DENIED, reasonCode=PASS_REVOKED
+  deactivate S
+  C --> D : 200 OK\nDENIED + reasonCode
+  deactivate C
+  return
+end
+
+S -> S : checkValidityWindow(pass, occurredAt)
+alt Not yet valid or expired
+  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=PASS_EXPIRED_OR_NOT_YET_VALID ...)
+  S -> KP : publish access_attempt_recorded
+  activate KP
+  KP -> KTOPIC : produce(event)
+  deactivate KP
+  S --> C : DENIED, reasonCode=PASS_EXPIRED_OR_NOT_YET_VALID
+  deactivate S
+  C --> D : 200 OK\nDENIED + reasonCode
+  deactivate C
+  return
+end
+
+S -> ZA : isAuthorized(tenantId, passScope, doorId)\n(zone derived from door)
+activate ZA
+ZA --> S : true or false
+deactivate ZA
+
+alt Out of scope
+  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=OUT_OF_SCOPE ...)
+  S -> KP : publish access_attempt_recorded
+  activate KP
+  KP -> KTOPIC : produce(event)
+  deactivate KP
+  S --> C : DENIED, reasonCode=OUT_OF_SCOPE
+  deactivate S
+  C --> D : 200 OK\nDENIED + reasonCode
+  deactivate C
+  return
+else Authorized
+end
+
+== Persist + respond ==
+
+S -> COREDB : insert access_attempts\n(tenantId, attemptId, doorId,\npassRef, decision=GRANTED, reason=OK,\noccurredAt, evaluatedAt, correlationId)
+note right of S
+Persist first, then publish event.
+Ensures deterministic replay on retries.
+end note
+
+S -> KP : publish access_attempt_recorded
+activate KP
+
+note right of KP
+Event envelope:
+- eventId UUID
+- eventType accessguard.access_attempt_recorded
+- schemaVersion int
+- tenantId
+- occurredAt
+- correlationId
+
+Payload:
+- attemptId
+- doorId
+- passRef (prefer passId or alias)
+- decision, reasonCode
+- evaluatedAt
+end note
+
+KP -> KTOPIC : produce(event)
+deactivate KP
+
+S --> C : GRANTED, reasonCode=OK, evaluatedAt, validUntil
+deactivate S
+C --> D : 200 OK\n{attemptId, decision, reasonCode, evaluatedAt, validUntil}
+deactivate C
+
+== Audit ingestion (async) ==
+
+KTOPIC -> AC : consume(event)
+activate AC
+
+AC -> AIS : handle(event)
+activate AIS
+
+AIS -> AR : existsByEventId(eventId)?
+activate AR
+AR --> AIS : true or false
+deactivate AR
+
+alt Duplicate eventId
+  AIS --> AC : skip (no-op)
+  deactivate AIS
+  deactivate AC
+else New event
+  AIS -> AUDITDB : insert audit_events\n(eventId, eventType, schemaVersion, tenantId, occurredAt, correlationId)
+  AIS -> AUDITDB : insert audit_access_attempts\n(tenantId, attemptId, doorId, passRef, decision, reasonCode, evaluatedAt)
+  AIS --> AC : ack
+  deactivate AIS
+  deactivate AC
+end
+
+@enduml
