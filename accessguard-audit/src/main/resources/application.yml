@@ -1,0 +1,23 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: accessguard-audit
+  datasource:
+    url: jdbc:postgresql://localhost:5432/accessguard_audit
+    username: accessguard
+    password: accessguard
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+  flyway:
+    enabled: true
+  logging:
+    level:
+      org.flywaydb: info

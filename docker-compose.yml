@@ -1,0 +1,11 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: accessguard-postgres
+    environment:
+      POSTGRES_USER: accessguard
+      POSTGRES_PASSWORD: accessguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
