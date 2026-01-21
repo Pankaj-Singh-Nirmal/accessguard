@@ -8,7 +8,7 @@ create table if not exists zones (
     parent_zone_id uuid null,
     name varchar(255) null,
     status varchar(32) not null default 'ACTIVE',
-    created_at timestamptz not null default now(),
+    created_at timestamptz not null,
     constraint uq_zones_tenant_code unique (tenant_id, zone_code),
     constraint fk_zones_parent foreign key (parent_zone_id) references zones(id),
     constraint ck_zones_status check (status in ('ACTIVE', 'INACTIVE'))
@@ -23,7 +23,7 @@ create table if not exists doors (
     zone_id uuid not null,
     name varchar(255) null,
     status varchar(32) not null default 'ACTIVE',
-    created_at timestamptz not null default now(),
+    created_at timestamptz not null,
     constraint uq_doors_tenant_code unique (tenant_id, door_code),
     constraint fk_doors_zone foreign key (zone_id) references zones(id),
     constraint ck_doors_status check (status in ('ACTIVE', 'INACTIVE'))
@@ -37,7 +37,7 @@ create table if not exists devices (
     device_code varchar(64) not null,
     status varchar(32) not null default 'ACTIVE',
     name varchar(255) null,
-    created_at timestamptz not null default now(),
+    created_at timestamptz not null,
     constraint uq_devices_tenant_code unique (tenant_id, device_code),
     constraint ck_devices_status check (status in ('ACTIVE', 'INACTIVE'))
 );
@@ -54,10 +54,10 @@ create table if not exists passes (
     revoked_at timestamptz null,
     revoked_reason varchar(500) null,
     revoked_by varchar(128) null,
-    created_at timestamptz not null default now(),
-    created_by varchar(128) not null,
-    updated_at timestamptz not null default now(),
-    updated_by varchar(128) not null,
+    created_at timestamptz not null,
+    created_by varchar(128) not null default 'system',
+    updated_at timestamptz not null,
+    updated_by varchar(128) not null default 'system',
     constraint uq_passes_tenant_pass_code unique (tenant_id, pass_code),
     constraint ck_pass_valid_window check (valid_from < valid_to),
     constraint ck_pass_status check (status in ('ACTIVE', 'REVOKED'))
@@ -69,8 +69,8 @@ create table if not exists pass_scope_doors (
     pass_id uuid not null,
     tenant_id varchar(64) not null,
     door_id uuid not null,
-    created_at timestamptz not null default now(),
-    created_by varchar(128) not null,
+    created_at timestamptz not null,
+    created_by varchar(128) not null default 'system',
     constraint pk_pass_scope_doors primary key (pass_id, door_id),
     constraint fk_psd_pass foreign key (pass_id) references passes(id) on delete cascade,
     constraint fk_psd_door foreign key (door_id) references doors(id) on delete restrict
@@ -82,8 +82,8 @@ create table if not exists pass_scope_zones (
     pass_id uuid not null,
     tenant_id varchar(64) not null,
     zone_id uuid not null,
-    created_at timestamptz not null default now(),
-    created_by varchar(128) not null,
+    created_at timestamptz not null,
+    created_by varchar(128) not null default 'system',
     constraint pk_pass_scope_zones primary key (pass_id, zone_id),
     constraint fk_psz_pass foreign key (pass_id) references passes(id) on delete cascade,
     constraint fk_psz_zone foreign key (zone_id) references zones(id) on delete restrict
@@ -103,7 +103,7 @@ create table if not exists access_attempts (
     occurred_at timestamptz not null,
     evaluated_at timestamptz not null,
     correlation_id varchar(128) null,
-    created_at timestamptz not null default now(),
+    created_at timestamptz not null,
     constraint uq_attempt_tenant_attempt_id unique (tenant_id, attempt_id),
     constraint fk_attempt_device foreign key (device_id) references devices(id),
     constraint fk_attempt_door foreign key (door_id) references doors(id),

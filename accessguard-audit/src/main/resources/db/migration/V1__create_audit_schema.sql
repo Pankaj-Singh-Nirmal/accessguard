@@ -8,7 +8,7 @@ create table if not exists audit_events (
     schema_version int not null,
     occurred_at timestamptz not null,
     correlation_id varchar(128) null,
-    received_at timestamptz not null default now()
+    received_at timestamptz not null
 );
 create index if not exists ix_audit_events_tenant_time on audit_events (tenant_id, occurred_at desc);
 create index if not exists ix_audit_events_type on audit_events (event_type);
@@ -27,7 +27,7 @@ create table if not exists audit_access_attempts (
     occurred_at timestamptz not null,
     evaluated_at timestamptz not null,
     correlation_id varchar(128) null,
-    created_at timestamptz not null default now(),
+    created_at timestamptz not null,
     constraint uq_audit_tenant_attempt unique (tenant_id, attempt_id),
     constraint fk_audit_attempt_event foreign key (event_id) references audit_events(event_id),
     constraint ck_audit_decision check (decision in ('GRANTED', 'DENIED'))
