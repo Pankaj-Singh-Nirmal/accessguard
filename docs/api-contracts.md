@@ -14,8 +14,9 @@ It also defines Kafka event contracts between services.
 ### Authentication and Authorization
 - Auth is JWT (OAuth2 Resource Server).
 - Tenant scope is mandatory:
-  - Admin/Security requests: `tenantId` derived from JWT claim (e.g., `tid`)
-  - Device requests: `tenantId` derived from device identity (and enforced in core)
+  - Admin/Security requests: `tenantId` derived from JWT claim`tenantId`
+    - If the JWT is valid but the `tenantId` claim is missing or blank, respond with **401 Unauthorized**
+  - Device requests: tenant context derived from authenticated device identity and resolved via device registry in core (no tenant claim, no tenant header)
 
 Roles (high level):
 - `TENANT_ADMIN`: pass management and administrative endpoints
@@ -383,6 +384,8 @@ Strict rules:
 - Kafka is the authoritative path for audit persistence.
 
 - Feign failures must not block core’s device API availability.
+
+- Internal endpoints under `/internal/v1/**` require `INTERNAL` role. Tenant claim is not required unless explicitly stated by the endpoint contract.
 
 ---
 

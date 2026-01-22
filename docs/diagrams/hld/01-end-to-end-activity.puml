@@ -27,7 +27,7 @@ Kafka event envelope (authoritative for audit):
 - tenantId: string
 - occurredAt: timestamp
 - correlationId: string optional
-Payload: attemptId, doorId, pass reference, decision, reasonCode
+Payload: attemptId, deviceCode, doorCode, zoneCode, passRef, decision, reasonCode, occurredAt, evaluatedAt
 endlegend
 
 |Tenant Admin|
@@ -35,7 +35,7 @@ start
 :Create or update pass\nPass APIs;
 note right
 Identity: JWT
-tenantId derived from JWT claim (e.g., tid)
+tenantId derived from JWT claim tenantId
 correlationId recommended per request
 end note
 
@@ -51,7 +51,7 @@ end note
 :Pass ready for use;
 
 |Access Device|
-:Submit access attempt\nPOST /access-attempts\nattemptId, doorId, passCode;
+:Submit access attempt\nPOST /access-attempts\nattemptId, doorCode, passCode;
 note right
 Identity: device credential (JWT or mTLS)
 tenantId derived in core from device identity
@@ -79,7 +79,7 @@ else (no)
   :Resolve device authorization\nwithin tenant;
 
   if (Device valid?) then (yes)
-    :Lookup door by doorId\nwithin tenant;
+    :Lookup door by doorCode\nwithin tenant;
 
     if (Door found?) then (yes)
       :Lookup pass by passCode\nwithin tenant;
@@ -144,12 +144,12 @@ end note
   :Publish event access_attempt_recorded;
   note right
 Event payload guidance:
-- include tenantId, attemptId, doorId
+- include tenantId, attemptId, deviceCode, doorCode, zoneCode, passRef
 - include decision + reasonCode
 - include correlationId for tracing
 - schemaVersion increments on contract changes
 Pass reference:
-- prefer passId or hashed/aliased passCode
+- passRef = passId when pass found; otherwise null
 end note
 
   |Access Device|

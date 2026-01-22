@@ -41,7 +41,7 @@ state ACTIVE {
   - passCode is immutable once issued (recommended)
   - tenantId is immutable
   - validFrom < validTo
-  - scope is tenant-scoped (doorIds/zoneIds belong to tenant)
+  - scope is tenant-scoped (doorCodes/zoneCodes belong to tenant)
   end note
 
   Active --> Active : Update validity window\nPATCH /passes/{id}\nif not revoked

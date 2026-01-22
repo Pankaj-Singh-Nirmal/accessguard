@@ -42,7 +42,7 @@ participant "AuditRepository" as AR
 
 == Request ==
 
-D -> C : POST /api/v1/access-attempts\nHeaders: correlationId (optional)\nBody: attemptId, doorId, passCode, occurredAt
+D -> C : POST /api/v1/access-attempts\nHeaders: correlationId (optional)\nBody: attemptId, doorCode, passCode, occurredAt
 activate C
 
 C -> TCR : deriveTenantContext(device identity)\nresolve tenantId
@@ -55,7 +55,7 @@ Device identity establishes tenant context.
 All subsequent lookups MUST be constrained by tenantId.
 end note
 
-C -> S : validateAccessAttempt(tenantId, deviceId, attemptId, doorId, passCode, occurredAt, correlationId)
+C -> S : validateAccessAttempt(tenantId, deviceId, attemptId, doorCode, passCode, occurredAt, correlationId)
 activate S
 
 == Idempotency (core) ==
@@ -80,13 +80,13 @@ end
 
 == Validation and decisioning ==
 
-S -> DR : findDoor(tenantId, doorId)
+S -> DR : findByTenantIdAndDoorCode(tenantId, doorCode)
 activate DR
-DR --> S : door or null
+DR --> S : door (includes internal doorId + zoneId) or null
 deactivate DR
 
 alt Door not found
-  S -> COREDB : insert access_attempts\n(tenantId, attemptId, doorId, passCodeRef, decision=DENIED, reason=DOOR_NOT_FOUND, occurredAt, correlationId)
+  S -> COREDB : insert access_attempts\n(tenantId, attemptId, doorCode, passCodeRef, decision=DENIED, reason=DOOR_NOT_FOUND, occurredAt, correlationId)
   note right of S
   Device API semantics:
   prefer 200 with decision to avoid leakage.
@@ -108,7 +108,7 @@ PR --> S : pass or null
 deactivate PR
 
 alt Pass not found
-  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=PASS_NOT_FOUND ...)
+  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=PASS_NOT_FOUND, doorIdResolved, doorCode, passCodeRef, occurredAt, correlationId ...)
   S -> KP : publish access_attempt_recorded
   activate KP
   KP -> KTOPIC : produce(event)
@@ -122,7 +122,7 @@ end
 
 S -> S : checkPassState(pass)
 alt Pass revoked
-  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=PASS_REVOKED ...)
+  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=PASS_REVOKED, doorIdResolved, doorCode, passRef, occurredAt, correlationId ...)
   S -> KP : publish access_attempt_recorded
   activate KP
   KP -> KTOPIC : produce(event)
@@ -136,7 +136,7 @@ end
 
 S -> S : checkValidityWindow(pass, occurredAt)
 alt Not yet valid or expired
-  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=PASS_EXPIRED_OR_NOT_YET_VALID ...)
+  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=PASS_EXPIRED_OR_NOT_YET_VALID, doorIdResolved, doorCode, passRef, occurredAt, correlationId ...)
   S -> KP : publish access_attempt_recorded
   activate KP
   KP -> KTOPIC : produce(event)
@@ -148,13 +148,13 @@ alt Not yet valid or expired
   return
 end
 
-S -> ZA : isAuthorized(tenantId, passScope, doorId)\n(zone derived from door)
+S -> ZA : isAuthorized(tenantId, passScope, doorCode)\n(zone derived from door)
 activate ZA
 ZA --> S : true or false
 deactivate ZA
 
 alt Out of scope
-  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=OUT_OF_SCOPE ...)
+  S -> COREDB : insert access_attempts\n(... decision=DENIED, reason=OUT_OF_SCOPE, doorIdResolved, doorCode, passRef, occurredAt, correlationId ...)
   S -> KP : publish access_attempt_recorded
   activate KP
   KP -> KTOPIC : produce(event)
@@ -169,7 +169,7 @@ end
 
 == Persist + respond ==
 
-S -> COREDB : insert access_attempts\n(tenantId, attemptId, doorId,\npassRef, decision=GRANTED, reason=OK,\noccurredAt, evaluatedAt, correlationId)
+S -> COREDB : insert access_attempts\n(tenantId, attemptId, doorIdResolved, doorCode,\npassRef, decision=GRANTED, reason=OK,\noccurredAt, evaluatedAt, correlationId)
 note right of S
 Persist first, then publish event.
 Ensures deterministic replay on retries.
@@ -189,8 +189,9 @@ Event envelope:
 
 Payload:
 - attemptId
-- doorId
-- passRef (prefer passId or alias)
+- doorCode
+- zoneCode
+- passRef = passId when found; null otherwise
 - decision, reasonCode
 - evaluatedAt
 end note
@@ -222,7 +223,7 @@ alt Duplicate eventId
   deactivate AC
 else New event
   AIS -> AUDITDB : insert audit_events\n(eventId, eventType, schemaVersion, tenantId, occurredAt, correlationId)
-  AIS -> AUDITDB : insert audit_access_attempts\n(tenantId, attemptId, doorId, passRef, decision, reasonCode, evaluatedAt)
+  AIS -> AUDITDB : insert audit_access_attempts\n(tenantId, attemptId, deviceCode, doorCode, zoneCode, passRef, decision, reasonCode, evaluatedAt)
   AIS --> AC : ack
   deactivate AIS
   deactivate AC
