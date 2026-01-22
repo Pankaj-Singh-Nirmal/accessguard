@@ -20,7 +20,7 @@ legend top
 Key points:
 - SECURITY is read-only
 - tenantId is derived from JWT claim and applied to every query
-- filters are optional but validated (time range, decision, doorId, attemptId, passRef, zoneId)
+- filters are optional but validated (time range, decision, doorCode, deviceCode, attemptId, passRef, zoneCode)
 - pagination is mandatory (page/size/sort) with a stable default sort
 endlegend
 
@@ -29,13 +29,12 @@ participant "accessguard-audit\nAuditQueryController" as QC
 participant "JwtTenantResolver" as JTR
 participant "AuditQueryService" as QS
 participant "AuditQueryValidator" as QV
-participant "ZoneResolver\n(optional)" as ZR
 database "audit-db" as AUDITDB
 participant "AuditRepository\n(read model)" as AR
 
 == Request ==
 
-SO -> QC : GET /api/v1/audit/access-attempts\nHeaders: Authorization: Bearer JWT\nQuery: from, to, decision, doorId, attemptId, passRef, zoneId, page, size, sort
+SO -> QC : GET /api/v1/audit/access-attempts\nHeaders: Authorization: Bearer JWT\nQuery: from, to, decision, doorCode, zoneCode, deviceCode, attemptId, passRef, page, size, sort
 activate QC
 
 QC -> JTR : extract tenantId + roles from JWT
@@ -50,7 +49,7 @@ Tenant isolation:
 - tenantId is mandatory for all reads
 end note
 
-QC -> QV : validateFilters(from,to,decision,doorId,attemptId,passRef,zoneId,page,size,sort)
+QC -> QV : validateFilters(from,to,decision,doorCode,zoneCode,deviceCode,attemptId,passRef,page,size,sort)
 activate QV
 
 alt Invalid filters
@@ -62,24 +61,6 @@ alt Invalid filters
 else Valid filters
   QV --> QC : ok (normalized filters)
   deactivate QV
-end
-
-== Optional: Zone filter handling ==
-
-alt zoneId filter present
-  QC -> ZR : resolveDoorIdsInZone(tenantId, zoneId)\noptional optimization
-  activate ZR
-  ZR --> QC : doorId set (could be empty)
-  deactivate ZR
-
-  note right of ZR
-Zone hierarchy is modeled in core, but audit may:
-- store zoneId/door-zone mapping as part of audit projection, OR
-- maintain its own zone reference snapshot for query-time filtering.
-
-Implementation choice:
-- Prefer audit projection includes doorId + zoneId for fast querying.
-  end note
 end
 
 == Query ==

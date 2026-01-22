@@ -115,6 +115,7 @@ Feign is reserved for non-authoritative, non-critical-path internal calls. Examp
 Strict rule:
 - The access attempt response must **not** depend on synchronous audit calls.
 - If Feign is unavailable, access decisioning in core must continue unaffected.
+- Internal calls are authenticated using service JWTs with role INTERNAL (mapped to ROLE_INTERNAL in Spring).
 
 ---
 ## Tenancy Model
@@ -123,8 +124,8 @@ Strict rule:
 
 - Every request is tenant-scoped.
 - Tenant context is established from authentication:
-    - `tenantId` is derived from JWT claims for admins/security users
-    - For devices, tenant context is derived from device identity (and/or JWT claim), and then enforced in all lookups
+    - `tenantId` is derived from JWT claim `tenantId` for admins/security users
+    - For devices, tenant context is derived from device identity, and then enforced in all lookups
 
 Tenant enforcement rules:
 - All reads/writes in core are filtered by `tenantId`.

@@ -22,6 +22,7 @@ For `POST /access-attempts`:
 For admin and audit APIs:
 - Use **Problem Details for HTTP APIs (RFC 9457)** via Spring `ProblemDetail`.
 - Include `errorCode` and `violations` extensions for validation failures.
+- If the JWT is valid but the `tenantId` claim is missing or blank, respond with **401 Unauthorized** (token is not acceptable for tenant-scoped APIs).
 
 ## Consequences
 ### Positive
