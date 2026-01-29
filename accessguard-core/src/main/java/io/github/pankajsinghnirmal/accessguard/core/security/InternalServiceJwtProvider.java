@@ -51,7 +51,7 @@ public final class InternalServiceJwtProvider {
                                           .id(UUID.randomUUID().toString())
                                           .issuedAt(now)
                                           .expiresAt(now.plusSeconds(120))
-                                          .claim("tenant_id", tenantId)
+                                          .claim("tenantId", tenantId)
                                           .claim("roles", List.of("INTERNAL"))
                                           .build();
 

@@ -89,7 +89,7 @@ class CoreToAuditPropagationIT {
 
         mvc.perform(get("/secure/test/trigger-audit")
                    .header("X-Correlation-Id", "corr-123")
-                   .with(jwt().jwt(j -> j.claim("tenant_id", "tenant-a"))
+                   .with(jwt().jwt(j -> j.claim("tenantId", "tenant-a"))
                               .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
            .andExpect(status().isOk());
 
@@ -103,7 +103,7 @@ class CoreToAuditPropagationIT {
         Jwt decoded = jwtDecoder.decode(token);
 
         Assertions.assertThat(decoded.getClaimAsString("iss")).isEqualTo(ISSUER);
-        Assertions.assertThat(decoded.getClaimAsString("tenant_id")).isEqualTo("tenant-a");
+        Assertions.assertThat(decoded.getClaimAsString("tenantId")).isEqualTo("tenant-a");
         Assertions.assertThat(decoded.getClaimAsStringList("roles")).contains("INTERNAL");
     }
 
@@ -113,7 +113,7 @@ class CoreToAuditPropagationIT {
         lastCorrelationId.set(null);
 
         MvcResult result = mvc.perform(get("/secure/test/trigger-audit")
-                                      .with(jwt().jwt(j -> j.claim("tenant_id", "tenant-a"))
+                                      .with(jwt().jwt(j -> j.claim("tenantId", "tenant-a"))
                                                  .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
                               .andExpect(status().isOk())
                               .andReturn();

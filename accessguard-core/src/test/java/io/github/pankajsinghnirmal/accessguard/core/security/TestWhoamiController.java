@@ -16,7 +16,7 @@ class TestWhoamiController {
 
     @GetMapping("/secure/test/whoami")
     Map<String, Object> whoami(@AuthenticationPrincipal Jwt jwt, Authentication authentication) {
-        String tenant = jwt.getClaimAsString("tenant_id");
+        String tenant = jwt.getClaimAsString("tenantId");
 
         var authorities = authentication.getAuthorities().stream()
                                         .map(GrantedAuthority::getAuthority)

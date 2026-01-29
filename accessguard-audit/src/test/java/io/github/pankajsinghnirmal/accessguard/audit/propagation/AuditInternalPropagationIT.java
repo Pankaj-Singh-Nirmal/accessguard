@@ -47,7 +47,7 @@ class AuditInternalPropagationIT {
         registry.add("security.jwt.issuer", () -> ISSUER);
         registry.add("security.jwt.public-key-path", publicKey::toString);
         registry.add("security.jwt.require-tenant", () -> "true");
-        registry.add("security.jwt.tenant-claim", () -> "tenant_id");
+        registry.add("security.jwt.tenant-claim", () -> "tenantId");
         registry.add("security.jwt.roles-claim", () -> "roles");
         registry.add("security.jwt.role-prefix", () -> "ROLE_");
     }
@@ -96,7 +96,7 @@ class AuditInternalPropagationIT {
                                                   .claim("roles", roles);
 
         if (tenantId != null) {
-            claims.claim("tenant_id", tenantId);
+            claims.claim("tenantId", tenantId);
         }
 
         return encoder.encode(JwtEncoderParameters.from(claims.build())).getTokenValue();

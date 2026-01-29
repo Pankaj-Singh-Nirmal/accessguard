@@ -1,6 +1,3 @@
--- Audit DB schema (accessguard-audit)
--- Database: accessguard_audit
-
 create table if not exists audit_events (
     event_id uuid primary key,
     tenant_id varchar(64) not null,
@@ -8,7 +5,8 @@ create table if not exists audit_events (
     schema_version int not null,
     occurred_at timestamptz not null,
     correlation_id varchar(128) null,
-    received_at timestamptz not null
+    received_at timestamptz not null,
+    constraint uq_audit_events_tenant_event_id unique (tenant_id, event_id)
 );
 create index if not exists ix_audit_events_tenant_time on audit_events (tenant_id, occurred_at desc);
 create index if not exists ix_audit_events_type on audit_events (event_type);
@@ -29,7 +27,7 @@ create table if not exists audit_access_attempts (
     correlation_id varchar(128) null,
     created_at timestamptz not null,
     constraint uq_audit_tenant_attempt unique (tenant_id, attempt_id),
-    constraint fk_audit_attempt_event foreign key (event_id) references audit_events(event_id),
+    constraint fk_audit_attempt_event foreign key (tenant_id, event_id) references audit_events(tenant_id, event_id),
     constraint ck_audit_decision check (decision in ('GRANTED', 'DENIED'))
 );
 create index if not exists ix_audit_attempts_tenant_eval on audit_access_attempts (tenant_id, evaluated_at desc);

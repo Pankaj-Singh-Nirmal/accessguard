@@ -2,7 +2,7 @@ security:
   jwt:
     issuer: accessguard-dev
     public-key-path: ${SECURITY_JWT_PUBLIC_KEY_PATH:dev-keys/dev-public.pem}
-    tenant-claim: tenant_id
+    tenant-claim: tenantId
     roles-claim: roles
     role-prefix: ROLE_
     require-tenant: true

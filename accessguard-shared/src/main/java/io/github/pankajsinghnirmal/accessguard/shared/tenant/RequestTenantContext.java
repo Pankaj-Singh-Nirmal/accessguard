@@ -38,7 +38,7 @@ public final class RequestTenantContext implements TenantContext {
     private static Optional<String> extractTenantIdFromSecurityContext() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof JwtAuthenticationToken jwtAuth) {
-            String tenant = jwtAuth.getToken().getClaimAsString("tenant_id");
+            String tenant = jwtAuth.getToken().getClaimAsString("tenantId");
             if (tenant != null && !tenant.isBlank()) {
                 return Optional.of(tenant);
             }
