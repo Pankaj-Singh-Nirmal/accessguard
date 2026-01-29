@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 
@@ -17,6 +18,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@ActiveProfiles("test")
 class AuditPersistenceSmokeIT {
 
     @Autowired
@@ -32,7 +34,7 @@ class AuditPersistenceSmokeIT {
     @ServiceConnection
     protected static final PostgreSQLContainer<?> POSTGRES =
             new PostgreSQLContainer<>("postgres:16")
-                    .withDatabaseName("accessguard_core")
+                    .withDatabaseName("accessguard_audit")
                     .withUsername("accessguard")
                     .withPassword("accessguard");
 

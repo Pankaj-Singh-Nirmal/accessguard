@@ -15,6 +15,16 @@ spring:
         format_sql: false
   flyway:
     enabled: true
-  logging:
-    level:
-      org.flywaydb: info
+  config:
+    import: "classpath:security-jwt.yml"
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.flywaydb: INFO
+
+security:
+  internal-jwt:
+    private-key-path: ${SECURITY_INTERNAL_JWT_PRIVATE_KEY_PATH:dev-keys/dev-private.pem}
+    issuer: ${SECURITY_INTERNAL_JWT_ISSUER:accessguard-dev}
+    subject: ${SECURITY_INTERNAL_JWT_SUBJECT:accessguard-core}

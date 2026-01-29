@@ -18,6 +18,10 @@ spring:
         format_sql: false
   flyway:
     enabled: true
-  logging:
-    level:
-      org.flywaydb: info
+  config:
+    import: "classpath:security-jwt.yml"
+
+logging:
+  level:
+    org.flywaydb: INFO
+    org.springframework.security: DEBUG

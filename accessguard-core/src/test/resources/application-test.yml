@@ -1,0 +1,8 @@
+security:
+  internal-jwt:
+    private-key: classpath:dev-keys/dev-private.pem
+    issuer: accessguard-dev
+    subject: accessguard-core
+  jwt:
+    issuer: accessguard-dev
+    public-key: classpath:dev-keys/dev-public.pem

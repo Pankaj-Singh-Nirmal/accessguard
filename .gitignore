@@ -1,5 +1,7 @@
 target/
 **/target/
+dev-keys/dev-private.pem
+**/dev-keys/dev-private.pem
 
 ### IntelliJ IDEA ###
 .idea/
