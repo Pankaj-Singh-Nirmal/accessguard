@@ -24,7 +24,10 @@ logging:
     org.flywaydb: INFO
 
 security:
+  jwt:
+    public-key: file:dev-keys/dev-public.pem
+
   internal-jwt:
-    private-key-path: ${SECURITY_INTERNAL_JWT_PRIVATE_KEY_PATH:dev-keys/dev-private.pem}
+    private-key: file:dev-keys/dev-private.pem
     issuer: ${SECURITY_INTERNAL_JWT_ISSUER:accessguard-dev}
     subject: ${SECURITY_INTERNAL_JWT_SUBJECT:accessguard-core}

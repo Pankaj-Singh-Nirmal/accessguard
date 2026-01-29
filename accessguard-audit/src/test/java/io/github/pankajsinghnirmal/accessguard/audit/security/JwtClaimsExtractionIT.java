@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "security.jwt.issuer=accessguard-dev",
         "security.jwt.public-key-path=../dev-keys/dev-public.pem",
-        "security.jwt.tenant-claim=tenant_id",
+        "security.jwt.tenant-claim=tenantId",
         "security.jwt.roles-claim=roles",
         "security.jwt.role-prefix=ROLE_",
         "security.jwt.require-tenant=true"
@@ -105,7 +105,7 @@ class JwtClaimsExtractionIT {
                                                       .claim("roles", roles);
 
             if (tenantId != null) {
-                claims.claim("tenant_id", tenantId);
+                claims.claim("tenantId", tenantId);
             }
 
             return encoder.encode(JwtEncoderParameters.from(claims.build())).getTokenValue();
