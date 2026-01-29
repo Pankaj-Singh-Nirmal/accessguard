@@ -42,8 +42,8 @@ Communication:
 ## Technology Stack
 
 - **Language:** Java 21
-- **Framework:** Spring Boot 3.5.9 (Spring MVC)
-- **Persistence:** PostgreSQL, Flyway
+- **Framework:** Spring Boot 3.5.9 (Spring MVC – REST APIs)
+- **Persistence:** Spring Data JPA (Hibernate), PostgreSQL, Flyway
 - **Messaging:** Kafka
 - **Security:** Spring Security (OAuth2 Resource Server, JWT)
 - **Observability:** Actuator, Micrometer
@@ -63,3 +63,18 @@ accessguard/
   accessguard-shared/
   docs/
   .github/
+```
+
+## Local JWT keys (development only)
+
+The services run as an OAuth2 Resource Server and verify JWT signatures using an RSA public key.
+
+### Generate a dev keypair
+
+From repo root:
+
+```bash
+mkdir -p dev-keys
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out dev-keys/dev-private.pem
+openssl pkey -in dev-keys/dev-private.pem -pubout -out dev-keys/dev-public.pem
+```
